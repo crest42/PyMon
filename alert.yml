@@ -1,0 +1,12 @@
+---
+- name: mail
+  type: mail
+  enabled: False
+  params:
+      hostname: smtp.example.com
+      port: 587
+      username: "username"
+      password: "secret"
+      starttls: True
+- name: logger
+  type: logger
