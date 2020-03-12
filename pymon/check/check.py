@@ -3,6 +3,7 @@ from .exceptions import (MissingHostEntry, MissingCheckParams,
                          CheckTypeUnknown)
 from ..ssh import Ssh
 from socket import timeout
+from paramiko.ssh_exception import NoValidConnectionsError
 
 class CheckResultList:
 
@@ -32,6 +33,9 @@ class CheckResult:
         self.state = state
         self.output = output
 
+    def __eq__(self, other):
+        return (self.state == other.state)
+
     def __repr__(self):
         state = 'OK'
         if self.state is None:
@@ -56,24 +60,30 @@ class CheckResult:
 
 class Check:
 
+    DEFAULT_PARAMETER={
+                        'threshold': 1,
+                        'cycles': 10,
+                      }
+
     def __init__(self, check, mandatory, optional=None):
         if 'name' not in check:
             raise MissingAttributeError('name', check)
         self.name = check['name']
 
-        self.expect = None
-
         if 'hosts' not in check:
             raise MissingHostEntry(check)
+        self.hosts = check['hosts']
 
         if 'params' not in check:
             raise MissingCheckParams(check)
+        self.params = check['params']
 
+        self.expect = None
         if 'expect' in check:
             self.expect = check['expect']
 
-        self.hosts = check['hosts']
-        self.params = check['params']
+        self.set_default_parameter(check)
+
         for attr in mandatory:
             if attr not in check['params']:
                 raise MissingAttributeError(self, attr)
@@ -85,6 +95,13 @@ class Check:
                     setattr(self, attr, check['params'][attr])
                 else:
                     setattr(self, attr, None)
+
+    def set_default_parameter(self, check):
+        for param in Check.DEFAULT_PARAMETER:
+            if param in check:
+                setattr(self, param, check[param])
+            else:
+                setattr(self, param, Check.DEFAULT_PARAMETER[param])
 
     def __repr__(self):
         return 'CHECK REPR NYI'
@@ -108,6 +125,12 @@ class RemoteCheck(Check):
         self.type = RemoteCheck.TYPE
         super().__init__(check, mandatory, optional)
 
+    def execute_command(self, remote, command):
+        if remote is None:
+            raise MissingRemoteError()
+        return_code, stdout, stderr = remote.exec(command)
+        return CheckResult(self, return_code, stdout, stderr)
+
     def execute(self, remote):
         if remote is None:
             raise MissingRemoteError()
@@ -120,6 +143,8 @@ class RemoteCheck(Check):
             remote.connect()
         except timeout:
             return CheckResult(self, -1, state=2, output='Timeout on ssh connect')
+        except NoValidConnectionsError as exception:
+            return CheckResult(self, -1, state=2, output=exception)
         except Exception:
             raise
 

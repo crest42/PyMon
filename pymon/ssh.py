@@ -24,6 +24,7 @@ class Ssh:
         chan.exec_command(command)
         return_code = -1
         return_code = chan.recv_exit_status()
+        chan.shutdown(2)
         if chan.recv_ready():
             read_list, _, _ = select.select([chan], [], [], 0.0)
             if len(read_list) > 0:
@@ -33,6 +34,7 @@ class Ssh:
             if len(read_list) > 0:
                 err_str = chan.recv_stderr(1024).decode('utf-8')
         return (return_code, out_str, err_str)
+
 
     def disconnect(self):
         self.client.close()

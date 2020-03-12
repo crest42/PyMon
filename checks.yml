@@ -1,12 +1,12 @@
 ---
-- name: test1
+- name: smtp
   type: tcp
   params:
-    port: 22
+    port: 25
   hosts:
-    - localhost
     - terra01.chilio.net
-- name: test2
+  cycles: 3
+- name: /tmp
   type: file
   params:
     filename: '/tmp'
@@ -15,3 +15,16 @@
     access_rights: '1777'
   hosts:
     - localhost
+    - terra01.chilio.net
+  cycles: 3
+
+- name: pid
+  type: process
+  params:
+    pid_file: '/run/sshd.pid'
+  expect:
+    Uid: 0 0 0 0
+    Name: 'sshd'
+  hosts:
+    - localhost
+  cycles: 3

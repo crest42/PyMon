@@ -1,16 +1,19 @@
 import logging
+import time
 from .exceptions import HostEntryNotValid
 from .check import CheckFactory
 from .alert import AlertFactory
 from .host import Host
+from .logging import logger
 
 class PyMon:
 
-    def __init__(self, host_list, check_list, alert_list):
+    def __init__(self, host_list, check_list, alert_list, daemonize=False):
         self.hosts = {}
         self.checks = []
         self.alerts = []
-        self.logger = logging.getLogger('PyMon')
+        self.logger = logger
+
         for host in host_list:
             if 'name' not in host:
                 raise HostEntryNotValid(host)
@@ -23,6 +26,17 @@ class PyMon:
 
         for alert in alert_list:
             self.alerts.append(AlertFactory(alert).create())
+
+        if daemonize:
+            self.runloop()
+
+    def runloop(self):
+        run = 0
+        while True:
+            self.logger.info(f"Start Run {run}")
+            self.run()
+            run += 1
+            time.sleep(1)
 
     def add_check(self, check):
         for host in check.hosts:
@@ -45,8 +59,8 @@ class PyMon:
         print()
 
     def run(self):
-        print("Run:")
         for k in self.hosts:
             result = self.hosts[k].run()
-            for alert in self.alerts:
-                alert.send(result)
+            if result is not None and len(result['RESULTS'].list) > 0:
+                for alert in self.alerts:
+                    alert.send(result)
